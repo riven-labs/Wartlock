@@ -68,6 +68,14 @@ jobs:
         shell: bash
         run: npm run build:icons
 
+      # electron-vite produces `out/main/index.js`, `out/preload/index.mjs`
+      # and `out/renderer/` — electron-builder refuses to package without it.
+      # We run this separately from electron-builder so the two stages show
+      # as distinct steps in the Actions log and any failure is obvious.
+      - name: Compile app (electron-vite)
+        shell: bash
+        run: npx electron-vite build
+
       - name: Build Windows installer
         shell: bash
         run: npx electron-builder --win --publish never
