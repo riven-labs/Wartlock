@@ -1,6 +1,13 @@
 import Database from 'better-sqlite3'
 import fs from 'fs'
 
+const DEFAULT_PEER = 'http://217.182.64.43:3001/'
+// The old hardcoded default that shipped in earlier releases. Anyone stuck on
+// it almost certainly doesn't have a node running locally, so silently bump
+// them to the public one on startup (the privacy warning still shows in the
+// Settings UI).
+const LEGACY_LOCAL_PEER = 'http://localhost:3000'
+
 if (fs.existsSync('wartwallet.db')) {
   // Connect to the SQLite database
   const db = new Database('wartwallet.db')
@@ -118,8 +125,14 @@ db.exec(`
 const count = db.prepare('SELECT COUNT(*) as count FROM data;').get()
 if (count.count === 0) {
   db.prepare(
-    "INSERT INTO data (key, value, last_modified) VALUES ('peer', 'http://localhost:3000', CURRENT_TIMESTAMP);",
-  ).run()
+    "INSERT INTO data (key, value, last_modified) VALUES ('peer', ?, CURRENT_TIMESTAMP);",
+  ).run(DEFAULT_PEER)
+} else {
+  // One-time soft migration: upgrade anyone still on the legacy localhost
+  // default (which almost never resolves) to a public node that works.
+  db.prepare(
+    "UPDATE data SET value = ?, last_modified = CURRENT_TIMESTAMP WHERE key = 'peer' AND value = ?;",
+  ).run(DEFAULT_PEER, LEGACY_LOCAL_PEER)
 }
 
 export class WalletDB {
@@ -150,10 +163,11 @@ export class WalletDB {
     address: string,
     pk: string,
     salt: string,
+    lastBalance?: string,
   ): void {
     db.prepare(
-      'INSERT INTO wallets (name, address, pk, salt, last_modified) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP);',
-    ).run(name, address, pk, salt)
+      'INSERT INTO wallets (name, address, pk, salt, last_balance, last_modified) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP);',
+    ).run(name, address, pk, salt, lastBalance ?? '0')
   }
 
   static updateBalance(address: string, balance: string): void {
@@ -176,6 +190,6 @@ export class WalletDB {
     const result = db
       .prepare("SELECT value FROM data WHERE key = 'peer';")
       .get()
-    return result ? result.value : 'http://localhost:3000'
+    return result ? result.value : DEFAULT_PEER
   }
 }

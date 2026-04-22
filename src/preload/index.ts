@@ -19,14 +19,31 @@ if (process.contextIsolated) {
       getWalletByAddress: (address: string) =>
         ipcRenderer.invoke('getWalletByAddress', address),
       getWalletById: (id: number) => ipcRenderer.invoke('getWalletById', id),
-      insertWallet: (name: string, address: string, pk: string, salt: string) =>
-        ipcRenderer.invoke('insertWallet', name, address, pk, salt),
+      insertWallet: (
+        name: string,
+        address: string,
+        pk: string,
+        salt: string,
+        lastBalance?: string,
+      ) =>
+        ipcRenderer.invoke(
+          'insertWallet',
+          name,
+          address,
+          pk,
+          salt,
+          lastBalance,
+        ),
       updateBalance: (address: string, balance: string) =>
         ipcRenderer.invoke('updateBalance', address, balance),
       deleteWallet: (address: string) =>
         ipcRenderer.invoke('deleteWallet', address),
       updatePeer: (peer: string) => ipcRenderer.invoke('updatePeer', peer),
       getPeer: () => ipcRenderer.invoke('getPeer'),
+      getPublicNodes: () => ipcRenderer.invoke('getPublicNodes'),
+      pickWalletDbFile: () => ipcRenderer.invoke('pickWalletDbFile'),
+      importWalletsFromDb: (dbPath: string, password: string) =>
+        ipcRenderer.invoke('importWalletsFromDb', dbPath, password),
     })
 
     // Crypto related
@@ -55,6 +72,63 @@ if (process.contextIsolated) {
         ipcRenderer.invoke('mnemonicToSeed', mnemonic, passphrase),
     })
 
+    // Hardware info
+    contextBridge.exposeInMainWorld('hardwareAPI', {
+      get: () => ipcRenderer.invoke('hardware:get'),
+    })
+
+    // Miner related
+    contextBridge.exposeInMainWorld('minerAPI', {
+      pickBinary: () => ipcRenderer.invoke('miner:pickBinary'),
+      getStoredBinary: () => ipcRenderer.invoke('miner:getStoredBinary'),
+      defaultVersion: () => ipcRenderer.invoke('miner:defaultVersion'),
+      download: (version?: string | null) =>
+        ipcRenderer.invoke('miner:download', version),
+      getState: () => ipcRenderer.invoke('miner:state'),
+      start: (config: unknown, options: unknown) =>
+        ipcRenderer.invoke('miner:start', config, options),
+      stop: () => ipcRenderer.invoke('miner:stop'),
+      setDonation: (enabled: boolean) =>
+        ipcRenderer.invoke('miner:setDonation', enabled),
+      onDownloadProgress: (cb: (p: unknown) => void) => {
+        const listener = (_: unknown, data: unknown): void => cb(data)
+        ipcRenderer.on('miner:download-progress', listener)
+        return () =>
+          ipcRenderer.removeListener('miner:download-progress', listener)
+      },
+      onState: (cb: (s: unknown) => void) => {
+        const listener = (_: unknown, data: unknown): void => cb(data)
+        ipcRenderer.on('miner:state', listener)
+        return () => ipcRenderer.removeListener('miner:state', listener)
+      },
+      onLog: (cb: (line: unknown) => void) => {
+        const listener = (_: unknown, data: unknown): void => cb(data)
+        ipcRenderer.on('miner:log', listener)
+        return () => ipcRenderer.removeListener('miner:log', listener)
+      },
+      onStats: (cb: (stats: unknown) => void) => {
+        const listener = (_: unknown, data: unknown): void => cb(data)
+        ipcRenderer.on('miner:stats', listener)
+        return () => ipcRenderer.removeListener('miner:stats', listener)
+      },
+      onExit: (cb: (payload: { code: number | null }) => void) => {
+        const listener = (_: unknown, data: { code: number | null }): void =>
+          cb(data)
+        ipcRenderer.on('miner:exit', listener)
+        return () => ipcRenderer.removeListener('miner:exit', listener)
+      },
+      onStarted: (
+        cb: (payload: { pid: number; startedAt: number }) => void,
+      ) => {
+        const listener = (
+          _: unknown,
+          data: { pid: number; startedAt: number },
+        ): void => cb(data)
+        ipcRenderer.on('miner:started', listener)
+        return () => ipcRenderer.removeListener('miner:started', listener)
+      },
+    })
+
     // Wallet related
     contextBridge.exposeInMainWorld('walletAPI', {
       walletFromSeed: (seed: string) =>
@@ -66,6 +140,9 @@ if (process.contextIsolated) {
       getBalance: (peerUrl: string, address: string) =>
         ipcRenderer.invoke('getBalance', peerUrl, address),
       fetchWarthogPrice: () => ipcRenderer.invoke('fetchWarthogPrice'),
+      fetchWarthogMarket: () => ipcRenderer.invoke('fetchWarthogMarket'),
+      fetchWarthogPriceHistory: (days: number) =>
+        ipcRenderer.invoke('fetchWarthogPriceHistory', days),
       sendTransaction: (
         recipient: string,
         amount: number,

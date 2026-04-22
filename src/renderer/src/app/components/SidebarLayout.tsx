@@ -1,18 +1,20 @@
-import { addToast, cn } from '@heroui/react'
 import {
   Sidebar,
   SidebarBody,
   SidebarLink,
 } from '@renderer/components/ui/sidebar'
+import { addToast } from '@renderer/components/ui/toast'
+import { cn } from '@renderer/lib/cn'
 import { useRequest } from 'ahooks'
 import { useState, type FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FiSettings } from 'react-icons/fi'
 import { GoHomeFill } from 'react-icons/go'
+import { LuHeartHandshake, LuMonitorCog, LuPickaxe } from 'react-icons/lu'
 import { useParams } from 'react-router'
 import { Wallet } from '../wallets/types'
 import { Logo } from './Logo'
-import { SwitchTheme } from './SwitchTheme'
+import { RivenBrand } from './RivenBrand'
 
 export const SidebarLayout: FC<{ children: React.ReactNode }> = ({
   children,
@@ -23,15 +25,29 @@ export const SidebarLayout: FC<{ children: React.ReactNode }> = ({
 
   const links = [
     {
-      label: t('navigation.walletManagement'),
+      label: t('navigation.home'),
       href: '/',
-      icon: <GoHomeFill className="text-default-600" size={24} />,
+      icon: <GoHomeFill size={20} />,
     },
-
+    {
+      label: t('navigation.hardware'),
+      href: '/hardware',
+      icon: <LuMonitorCog size={20} />,
+    },
+    {
+      label: t('navigation.mining'),
+      href: '/mining',
+      icon: <LuPickaxe size={20} />,
+    },
+    {
+      label: t('navigation.support'),
+      href: '/support',
+      icon: <LuHeartHandshake size={20} />,
+    },
     {
       label: t('navigation.settings'),
       href: '/settings',
-      icon: <FiSettings className="text-default-600" size={24} />,
+      icon: <FiSettings size={20} />,
     },
   ]
 
@@ -50,22 +66,22 @@ export const SidebarLayout: FC<{ children: React.ReactNode }> = ({
   )
 
   return (
-    <div className="flex h-screen w-full flex-1 flex-col overflow-hidden bg-default-50 text-foreground md:flex-row">
+    <div className="flex h-screen w-full flex-1 flex-col overflow-hidden bg-background text-foreground md:flex-row">
       <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between gap-10 border-r-2 border-default-50 *:z-20">
+        <SidebarBody className="justify-between gap-10 border-r border-riven-border bg-riven-surface px-3 py-5 *:z-20">
           <Logo />
           <div
             className={cn(
-              'flex flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden',
+              'flex flex-1 flex-col overflow-y-auto overflow-x-hidden',
               open && 'w-full',
             )}
           >
-            <div className="mt-8 flex w-full flex-col gap-8">
+            <div className="mt-6 flex w-full flex-col gap-1">
               {links.map((link, idx) => (
                 <SidebarLink
                   key={idx}
                   link={link}
-                  className="flex items-center gap-9 rounded-xl px-4 py-[14.5px] font-light"
+                  className="flex items-center gap-4 rounded-lg px-3 py-2.5 text-sm"
                   onClick={(e) => {
                     if (!privateKey || !wallet || !walletId) return
                     e.preventDefault()
@@ -79,12 +95,11 @@ export const SidebarLayout: FC<{ children: React.ReactNode }> = ({
               ))}
             </div>
           </div>
-          <SwitchTheme />
+
+          <RivenBrand />
         </SidebarBody>
       </Sidebar>
-      <div className="flex-1 space-y-9 overflow-auto px-2 md:px-7">
-        {children}
-      </div>
+      <div className="flex-1 overflow-auto px-4 md:px-10">{children}</div>
     </div>
   )
 }

@@ -1,0 +1,72 @@
+name: Release Windows
+
+# Triggered by pushing a tag like `v1.2.3`. Also exposed as a manual
+# dispatch so maintainers can kick off a build without tagging first.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # `npm ci` runs postinstall → `electron-builder install-app-deps` which
+      # rebuilds better-sqlite3 and keytar against the Electron ABI. The
+      # windows-latest runner ships VS2022 + Windows SDK, so the native
+      # toolchain is available.
+      - name: Install dependencies
+        run: npm ci
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Generate icons
+        run: npm run build:icons
+
+      # Build NSIS installer. `--publish never` keeps electron-builder from
+      # trying to hit the `publish` endpoint configured in electron-builder.yml
+      # — we upload via softprops/action-gh-release in the next step instead,
+      # which is easier to debug when something goes wrong.
+      - name: Build Windows installer
+        run: npx electron-builder --win --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wartlock-windows
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          retention-days: 14
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          fail_on_unmatched_files: false
+          draft: true
+          generate_release_notes: true

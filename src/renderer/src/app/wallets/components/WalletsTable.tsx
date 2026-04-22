@@ -1,207 +1,163 @@
-import {
-  Button,
-  Chip,
-  Pagination,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react'
-import { useCallback, useMemo, useState, type FC } from 'react'
+import { ExplorerLink } from '@renderer/components/ExplorerLink'
+import { Pagination } from '@renderer/components/ui/pagination'
+import { Table } from '@renderer/components/ui/table'
+import { cn } from '@renderer/lib/cn'
+import { useMemo, useState, type FC } from 'react'
 import { useTranslation } from 'react-i18next'
-import { IoCalendarOutline } from 'react-icons/io5'
-import { LuWallet } from 'react-icons/lu'
-import { MdOutlineRadar } from 'react-icons/md'
-import { RiMoneyEuroCircleLine } from 'react-icons/ri'
+import { LuArrowDown, LuArrowUp } from 'react-icons/lu'
 import { type Wallet } from '../types'
+import type { LiveBalances } from '../useLiveBalances'
 import { useWallet } from '../WalletContext'
 import { PasswordModal } from './PasswordModal'
 
-export const WalletsTable: FC = () => {
+const PAGE_SIZE = 10
+
+type ColumnKey =
+  | 'name'
+  | 'address'
+  | 'balance'
+  | 'balanceUsd'
+  | 'lastIdentifiedDate'
+  | 'actions'
+
+type Props = {
+  live: LiveBalances
+}
+
+export const WalletsTable: FC<Props> = ({ live }) => {
   const { wallets, loading } = useWallet()
   const [page, setPage] = useState(1)
   const { t } = useTranslation()
 
-  const columns = [
-    {
-      name: t('walletDetails.tableTitles.sender'),
-      uid: 'name',
-      icon: <LuWallet size={20} />,
-    },
-    {
-      name: t('walletDetails.tableTitles.recipient'),
-      uid: 'address',
-      icon: <MdOutlineRadar size={20} />,
-    },
-    {
-      name: t('walletDetails.balanceWART'),
-      uid: 'lastIdentifiedBalance',
-      icon: <RiMoneyEuroCircleLine size={20} />,
-    },
-    {
-      name: t('walletDetails.tableTitles.timestamp'),
-      uid: 'lastIdentifiedDate',
-      icon: <IoCalendarOutline size={20} />,
-    },
-    { name: t('walletDetails.tableTitles.actions'), uid: 'actions' },
-  ]
-
-  const rowsPerPage = 10
-
-  const pages = Math.ceil(wallets.length / rowsPerPage)
-
-  const items = useMemo(() => {
-    const start = (page - 1) * rowsPerPage
-    const end = start + rowsPerPage
-
-    return wallets.slice(start, end)
-  }, [page, wallets, rowsPerPage])
-
-  const onNextPage = useCallback(() => {
-    if (page < pages) {
-      setPage(page + 1)
-    }
-  }, [page, pages])
-
-  const onPreviousPage = useCallback(() => {
-    if (page > 1) {
-      setPage(page - 1)
-    }
-  }, [page])
-
-  const bottomContent = useMemo(() => {
-    return (
-      <div className="flex items-center justify-between px-2 py-2">
-        <span className="w-[30%]" />
-        <Pagination
-          isCompact
-          showControls
-          showShadow
-          color="default"
-          page={page}
-          total={pages}
-          onChange={setPage}
-        />
-        <div className="hidden w-[30%] justify-end gap-2 sm:flex">
-          <Button
-            isDisabled={pages === 1}
-            size="sm"
-            variant="flat"
-            onPress={onPreviousPage}
-          >
-            {t('walletDetails.previous')}
-          </Button>
-          <Button
-            isDisabled={pages === 1}
-            size="sm"
-            variant="flat"
-            onPress={onNextPage}
-          >
-            {t('walletDetails.next')}
-          </Button>
-        </div>
-      </div>
-    )
-  }, [onNextPage, onPreviousPage, page, pages, t])
-
-  const renderCell = useCallback(
-    (wallet: Wallet, columnKey: React.Key) => {
-      const cellValue = wallets[columnKey as keyof Wallet]
-
-      switch (columnKey) {
-        case 'name':
-          return (
-            <h3 className="text-bold text-sm capitalize text-default-700">
-              {wallet.name}
-            </h3>
-          )
-        case 'address':
-          return (
-            <div className="flex flex-col">
-              <p className="text-bold text-sm capitalize">{cellValue}</p>
-              <p className="text-bold text-sm text-default-400">
-                {wallet.address}
-              </p>
-            </div>
-          )
-        case 'lastIdentifiedBalance':
-          return (
-            <Chip
-              className="capitalize"
-              color="secondary"
-              size="sm"
-              variant="flat"
-            >
-              {wallet.last_balance}
-            </Chip>
-          )
-        case 'lastIdentifiedDate':
-          return (
-            <Chip
-              className="capitalize"
-              color="danger"
-              size="sm"
-              variant="flat"
-            >
-              {new Date(wallet.last_modified).toDateString()}
-            </Chip>
-          )
-        case 'actions':
-          return <PasswordModal walletId={wallet.id} />
-        default:
-          return cellValue
-      }
-    },
-    [wallets],
+  const columns = useMemo(
+    () => [
+      {
+        key: 'name' as ColumnKey,
+        label: t('walletDetails.tableTitles.sender'),
+      },
+      {
+        key: 'address' as ColumnKey,
+        label: t('walletDetails.tableTitles.recipient'),
+      },
+      {
+        key: 'balance' as ColumnKey,
+        label: t('walletDetails.balanceWART'),
+      },
+      {
+        key: 'balanceUsd' as ColumnKey,
+        label: 'USD',
+      },
+      {
+        key: 'lastIdentifiedDate' as ColumnKey,
+        label: t('walletDetails.tableTitles.timestamp'),
+      },
+      {
+        key: 'actions' as ColumnKey,
+        label: t('walletDetails.tableTitles.actions'),
+        align: 'end' as const,
+      },
+    ],
+    [t],
   )
 
-  return (
-    <Table
-      aria-label="Wallets Table"
-      bottomContent={bottomContent}
-      bottomContentPlacement="outside"
-      classNames={{ wrapper: 'max-h-[calc(100vh-240px)] scroll-sm' }}
-      radius="lg"
-    >
-      <TableHeader columns={columns}>
-        {(column) => (
-          <TableColumn
-            key={column.uid}
-            align={
-              [
-                'actions',
-                'lastIdentifiedBalance',
-                'lastIdentifiedDate',
-              ].includes(column.uid)
-                ? 'center'
-                : 'start'
-            }
-            className="px-8 py-4"
-          >
-            <div className="flex items-center gap-2.5">
-              {column?.icon} {column.name}
-            </div>
-          </TableColumn>
-        )}
-      </TableHeader>
-      <TableBody
-        items={items}
-        emptyContent={t('wallets.noWallets')}
-        isLoading={loading}
-        className="rounded-[20px] bg-default-100 p-5"
-      >
-        {(item) => (
-          <TableRow key={item.id}>
-            {(columnKey) => (
-              <TableCell className="py-5">
-                {renderCell(item, columnKey)}
-              </TableCell>
+  const pages = Math.max(1, Math.ceil(wallets.length / PAGE_SIZE))
+
+  const items = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return wallets.slice(start, start + PAGE_SIZE)
+  }, [page, wallets])
+
+  const renderCell = (wallet: Wallet, key: ColumnKey): React.ReactNode => {
+    const entry = live.balances[wallet.address]
+    const current = entry?.current ?? null
+    const previous = entry?.previous ?? null
+    const delta = current != null && previous != null ? current - previous : 0
+
+    switch (key) {
+      case 'name':
+        return (
+          <span className="text-sm font-medium text-foreground">
+            {wallet.name}
+          </span>
+        )
+      case 'address':
+        return <ExplorerLink value={wallet.address} kind="address" showIcon />
+      case 'balance':
+        return (
+          <div className="flex flex-col">
+            <span
+              className={cn(
+                'text-sm font-medium tabular-nums text-foreground transition-colors',
+                delta > 0 && 'text-success',
+                delta < 0 && 'text-danger',
+              )}
+            >
+              {current != null ? current.toFixed(4) : '—'}{' '}
+              <span className="text-xs font-normal text-riven-muted">WART</span>
+            </span>
+            {delta !== 0 && current != null && (
+              <span
+                className={cn(
+                  'mt-0.5 inline-flex items-center gap-0.5 text-[11px] tabular-nums',
+                  delta > 0 ? 'text-success' : 'text-danger',
+                )}
+              >
+                {delta > 0 ? (
+                  <LuArrowUp size={10} />
+                ) : (
+                  <LuArrowDown size={10} />
+                )}
+                {delta > 0 ? '+' : ''}
+                {delta.toFixed(4)}
+              </span>
             )}
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+          </div>
+        )
+      case 'balanceUsd':
+        return (
+          <span className="text-xs tabular-nums text-riven-muted">
+            {current != null ? `$${(current * live.priceUsd).toFixed(2)}` : '—'}
+          </span>
+        )
+      case 'lastIdentifiedDate':
+        return (
+          <span className="text-xs text-riven-muted">
+            {new Date(wallet.last_modified).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+            })}
+          </span>
+        )
+      case 'actions':
+        return (
+          <div className="flex justify-end">
+            <PasswordModal walletId={wallet.id} />
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Table<Wallet, ColumnKey>
+        aria-label="Wallets"
+        columns={columns}
+        rows={items}
+        rowKey={(w) => w.id}
+        renderCell={renderCell}
+        isLoading={loading}
+        emptyContent={
+          <span className="text-sm text-riven-muted">
+            {t('wallets.noWallets')}
+          </span>
+        }
+      />
+      <div className="flex justify-end">
+        <Pagination page={page} total={pages} onChange={setPage} />
+      </div>
+    </div>
   )
 }

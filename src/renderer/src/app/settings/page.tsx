@@ -6,13 +6,11 @@ import { SettingsNavbar } from './components/SettingsNavbar'
 const Settings: FC = () => {
   return (
     <WalletProvider>
-      <main className="min-h-screen bg-gradient-to-b from-default-50 to-default-100">
+      <main className="mx-auto max-w-3xl py-2">
         <SettingsNavbar />
-        <div className="container mx-auto px-4">
-          <section className="flex h-page items-center justify-center">
-            <SettingsForm />
-          </section>
-        </div>
+        <section className="mt-8">
+          <SettingsForm />
+        </section>
       </main>
     </WalletProvider>
   )

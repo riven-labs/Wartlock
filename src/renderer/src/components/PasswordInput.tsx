@@ -1,40 +1,30 @@
-import { Input } from '@heroui/react'
-import { FC, useState, type ComponentProps } from 'react'
+import { forwardRef, useState, type ForwardedRef } from 'react'
 import { FaEye, FaEyeSlash } from 'react-icons/fa'
+import { Input, type InputProps } from './ui/input'
 
-type PasswordInputProps = ComponentProps<typeof Input>
-
-export const PasswordInput: FC<PasswordInputProps> = ({
-  label = 'Password',
-  ...props
-}: PasswordInputProps) => {
+export const PasswordInput = forwardRef(function PasswordInput(
+  { label = 'Password', ...props }: InputProps,
+  ref: ForwardedRef<HTMLInputElement>,
+) {
   const [isVisible, setIsVisible] = useState(false)
-  const toggleVisibility = (): void => setIsVisible(!isVisible)
 
   return (
     <Input
-      name="password"
-      size="sm"
+      {...props}
+      ref={ref}
       label={label}
+      type={isVisible ? 'text' : 'password'}
       endContent={
         <button
-          className="focus:outline-none"
           type="button"
-          onClick={toggleVisibility}
-          aria-label="toggle password visibility"
+          tabIndex={-1}
+          onClick={() => setIsVisible((v) => !v)}
+          className="text-riven-muted hover:text-foreground"
+          aria-label="Toggle password visibility"
         >
-          {isVisible ? (
-            <FaEye className="pointer-events-none text-default-400" size={20} />
-          ) : (
-            <FaEyeSlash
-              className="pointer-events-none text-default-400"
-              size={20}
-            />
-          )}
+          {isVisible ? <FaEye size={14} /> : <FaEyeSlash size={14} />}
         </button>
       }
-      type={isVisible ? 'text' : 'password'}
-      {...props}
     />
   )
-}
+})

@@ -1,0 +1,20 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="Riven Labs">
+  <rect width="24" height="24" rx="5" fill="#0E0E10"/>
+  <rect x="0.5" y="0.5" width="23" height="23" rx="4.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.12"/>
+  <!-- Geometric "R" monogram: vertical spine + counter-triangle diagonal -->
+  <path
+    d="M8.25 6 L8.25 18"
+    stroke="#FAFAFA" stroke-width="1.8" stroke-linecap="round"
+  />
+  <path
+    d="M8.25 6 L14 6 a3 3 0 0 1 0 6 L8.25 12"
+    stroke="#FAFAFA" stroke-width="1.8" fill="none"
+    stroke-linecap="round" stroke-linejoin="round"
+  />
+  <path
+    d="M11.25 12 L16.2 18"
+    stroke="#FAFAFA" stroke-width="1.8" stroke-linecap="round"
+  />
+  <!-- Accent dot at the top-right, Riven signature -->
+  <circle cx="17.75" cy="6.25" r="1.25" fill="#2F6FEB"/>
+</svg>

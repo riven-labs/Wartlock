@@ -1,48 +1,26 @@
-import {
-  NavbarBrand,
-  Navbar as NavbarComponent,
-  NavbarContent,
-  NavbarItem,
-} from '@heroui/react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IoMdArrowBack } from 'react-icons/io'
 import { Link } from 'react-router'
-import { CreateWalletModal } from '../../components/CreateWalletModal'
-import { RecoverWalletModal } from '../../components/RecoverWalletModal'
 
 export const SettingsNavbar: FC = () => {
   const { t } = useTranslation()
 
   return (
-    <>
-      <NavbarComponent
-        maxWidth="full"
-        className="border-b-2 border-default-700 bg-default-900/90 py-4 backdrop-blur-sm dark:border-default-200 dark:bg-default-50/90"
+    <header className="py-8">
+      <Link
+        to="/"
+        className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-riven-muted transition-colors hover:text-foreground"
       >
-        <div className="container mx-auto flex items-center px-4">
-          <NavbarBrand>
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-default-300 transition-colors hover:text-primary-500 dark:text-default-700 dark:hover:text-primary-400"
-            >
-              <IoMdArrowBack size={20} />
-              <span className="font-medium">
-                {t('navigation.walletManagement')}
-              </span>
-            </Link>
-          </NavbarBrand>
-
-          <NavbarContent justify="end" className="gap-4">
-            <NavbarItem>
-              <RecoverWalletModal />
-            </NavbarItem>
-            <NavbarItem>
-              <CreateWalletModal />
-            </NavbarItem>
-          </NavbarContent>
-        </div>
-      </NavbarComponent>
-    </>
+        <IoMdArrowBack size={14} />
+        <span>{t('navigation.walletManagement')}</span>
+      </Link>
+      <h1 className="mt-3 text-[28px] font-semibold tracking-tight text-foreground">
+        {t('navigation.settings')}
+      </h1>
+      <p className="mt-1 text-sm text-riven-muted">
+        Configure your peer endpoint and language.
+      </p>
+    </header>
   )
 }

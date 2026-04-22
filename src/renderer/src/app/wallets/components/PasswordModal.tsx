@@ -1,19 +1,19 @@
+import { PasswordInput } from '@renderer/components/PasswordInput'
+import { Button } from '@renderer/components/ui/button'
+import { Form } from '@renderer/components/ui/form'
 import {
-  addToast,
-  Button,
-  Form,
   Modal,
   ModalBody,
-  ModalContent,
   ModalFooter,
   ModalHeader,
-  Tooltip,
-  useDisclosure,
-} from '@heroui/react'
-import { PasswordInput } from '@renderer/components/PasswordInput'
+  ModalTitle,
+} from '@renderer/components/ui/modal'
+import { addToast } from '@renderer/components/ui/toast'
+import { Tooltip } from '@renderer/components/ui/tooltip'
+import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LuEye } from 'react-icons/lu'
+import { LuEye, LuLock } from 'react-icons/lu'
 import { useNavigate } from 'react-router'
 
 interface PasswordModalProps {
@@ -21,7 +21,7 @@ interface PasswordModalProps {
 }
 
 export const PasswordModal: FC<PasswordModalProps> = ({ walletId }) => {
-  const { isOpen, onClose, onOpen } = useDisclosure()
+  const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure()
   const navigate = useNavigate()
   const { t } = useTranslation()
 
@@ -29,7 +29,6 @@ export const PasswordModal: FC<PasswordModalProps> = ({ walletId }) => {
     e: React.FormEvent<HTMLFormElement>,
   ): Promise<void> => {
     e.preventDefault()
-
     const formData = new FormData(e.currentTarget)
     const password = formData.get('password') as string
 
@@ -60,8 +59,7 @@ export const PasswordModal: FC<PasswordModalProps> = ({ walletId }) => {
 
       navigate(`/wallet/${walletId}`, { viewTransition: true })
       onClose()
-    } catch (error) {
-      console.error('Error decrypting wallet:', error)
+    } catch {
       addToast({
         title: t('passwordModal.error'),
         description: t('passwordModal.errorMessage'),
@@ -72,72 +70,43 @@ export const PasswordModal: FC<PasswordModalProps> = ({ walletId }) => {
 
   return (
     <>
-      <Tooltip
-        content={t('passwordModal.viewDetails')}
-        className="overflow-hidden"
-      >
-        <button onClick={onOpen}>
-          <LuEye size={20} />
+      <Tooltip content={t('passwordModal.viewDetails')}>
+        <button
+          onClick={onOpen}
+          className="rounded-md p-2 text-riven-muted transition-colors hover:bg-white/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          aria-label={t('passwordModal.viewDetails')}
+        >
+          <LuEye size={18} />
         </button>
       </Tooltip>
 
-      <Modal
-        backdrop="blur"
-        isOpen={isOpen}
-        onClose={onClose}
-        size="xl"
-        hideCloseButton
-        classNames={{ wrapper: 'overflow-hidden' }}
-        className="bg-default-100"
-      >
-        <ModalContent>
-          <div className="space-y-12 px-12 py-12">
-            <ModalHeader className="block space-y-6 text-center">
-              <h3 className="text-[28px]">{t('passwordModal.title')}</h3>
-            </ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="md">
+        <ModalHeader icon={<LuLock size={18} className="text-primary" />}>
+          <ModalTitle>{t('passwordModal.title')}</ModalTitle>
+          <p className="text-sm leading-relaxed text-riven-muted">
+            Enter your password to unlock and view wallet details.
+          </p>
+        </ModalHeader>
 
-            <ModalBody>
-              <Form
-                onSubmit={onSubmit}
-                id="password-modal"
-                className="space-y-8"
-              >
-                <PasswordInput
-                  name="password"
-                  errorMessage={t('passwordModal.invalidPassword')}
-                  labelPlacement="outside"
-                  label={t('common.password')}
-                  isRequired
-                  size="lg"
-                  variant="faded"
-                  autoFocus
-                  classNames={{ inputWrapper: 'bg-default-200' }}
-                />
-              </Form>
-            </ModalBody>
+        <ModalBody>
+          <Form onSubmit={onSubmit} id="password-modal">
+            <PasswordInput
+              name="password"
+              label={t('common.password')}
+              isRequired
+              autoFocus
+            />
+          </Form>
+        </ModalBody>
 
-            <ModalFooter>
-              <Button
-                color="danger"
-                variant="light"
-                onPress={onClose}
-                fullWidth
-                radius="sm"
-              >
-                {t('passwordModal.cancel')}
-              </Button>
-              <Button
-                color="secondary"
-                type="submit"
-                form="password-modal"
-                fullWidth
-                radius="sm"
-              >
-                {t('passwordModal.confirm')}
-              </Button>
-            </ModalFooter>
-          </div>
-        </ModalContent>
+        <ModalFooter>
+          <Button variant="ghost" onClick={onClose}>
+            {t('passwordModal.cancel')}
+          </Button>
+          <Button type="submit" form="password-modal" variant="primary">
+            {t('passwordModal.confirm')}
+          </Button>
+        </ModalFooter>
       </Modal>
     </>
   )

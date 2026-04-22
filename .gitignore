@@ -1,16 +1,56 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
 out
-.DS_Store
-.eslintcache
-*.log*
-.vscode
-*.bak
-*.db
-*.original
-.idea
+.vite
 
-# Lock files
+# Native module build artifacts
+**/build/Release
+**/prebuilds
+
+# Caches
+.eslintcache
+.cache
+.parcel-cache
+coverage
+*.tsbuildinfo
+
+# Logs
+*.log
+*.log.*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+*.iml
+*.bak
+*.swp
+*~
+
+# Secrets and env
+.env
+.env.*
+!.env.example
+
+# User data / wallet state — NEVER publish. The app writes these at runtime
+# and they contain encrypted private keys, salts, and session metadata.
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+_ww_export.json
+wartwallet.db
+
+# Transient / debug artifacts produced during local development
+asar-tmp
+.icon-ico
+*.original
+
+# Lock files (project policy: checked in locally only)
 package-lock.json
 pnpm-lock.yaml
 bun.lock

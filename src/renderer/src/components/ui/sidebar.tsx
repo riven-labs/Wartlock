@@ -1,4 +1,3 @@
-import { cn } from '@heroui/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import React, {
   createContext,
@@ -9,6 +8,7 @@ import React, {
 } from 'react'
 import { LuMenu, LuX } from 'react-icons/lu'
 import { NavLink } from 'react-router'
+import { cn } from '../../lib/cn'
 
 interface Links {
   label: string
@@ -79,22 +79,21 @@ export const DesktopSidebar: FC<ComponentProps<typeof motion.div>> = ({
 }) => {
   const { open, setOpen, animate } = useSidebar()
   return (
-    <>
-      <motion.div
-        className={cn(
-          'group/sidebar hidden h-full w-[90px] shrink-0 bg-default-100 px-4 py-4 md:flex md:flex-col',
-          className,
-        )}
-        animate={{
-          width: animate ? (open ? '342px' : '90px') : '90px',
-        }}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        {...props}
-      >
-        {children}
-      </motion.div>
-    </>
+    <motion.div
+      className={cn(
+        'group/sidebar hidden h-full w-[72px] shrink-0 flex-col md:flex',
+        className,
+      )}
+      animate={{
+        width: animate ? (open ? 240 : 72) : 72,
+      }}
+      transition={{ duration: 0.22, ease: [0.22, 0.61, 0.36, 1] }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      {...props}
+    >
+      {children}
+    </motion.div>
   )
 }
 
@@ -106,43 +105,38 @@ export const MobileSidebar: FC<ComponentProps<'div'>> = ({
   const { open, setOpen } = useSidebar()
 
   return (
-    <>
-      <div
-        className={cn(
-          'flex h-10 w-full flex-row justify-between px-4 py-4 md:hidden',
-        )}
-        {...props}
-      >
-        <button className="z-20 flex w-full cursor-pointer justify-end">
-          <LuMenu className="" onClick={() => setOpen(!open)} />
-        </button>
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              initial={{ x: '-100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '-100%', opacity: 0 }}
-              transition={{
-                duration: 0.3,
-                ease: 'easeInOut',
-              }}
-              className={cn(
-                'fixed inset-0 z-[100] flex h-full w-full flex-col justify-between p-10',
-                className,
-              )}
+    <div
+      className={cn(
+        'flex h-12 w-full flex-row items-center justify-between border-b border-riven-border bg-riven-surface px-4 md:hidden',
+      )}
+      {...props}
+    >
+      <button className="z-20 flex cursor-pointer">
+        <LuMenu size={20} onClick={() => setOpen(!open)} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ x: '-100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '-100%', opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className={cn(
+              'fixed inset-0 z-[100] flex h-full w-full flex-col justify-between bg-riven-surface p-10',
+              className,
+            )}
+          >
+            <button
+              className="absolute right-6 top-6 z-50 cursor-pointer text-riven-muted hover:text-foreground"
+              onClick={() => setOpen(!open)}
             >
-              <button
-                className="absolute right-10 top-10 z-50 cursor-pointer text-neutral-800 dark:text-neutral-200"
-                onClick={() => setOpen(!open)}
-              >
-                <LuX />
-              </button>
-              {children}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </>
+              <LuX size={20} />
+            </button>
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -158,24 +152,42 @@ export const SidebarLink: FC<
       to={link.href}
       className={({ isActive }) =>
         cn(
-          'flex items-center justify-start gap-2 py-2 hover:bg-default-200',
-          isActive ? 'bg-default-200' : 'opacity-50',
+          'group relative flex items-center gap-4 rounded-lg px-3 py-2.5 text-sm text-riven-muted transition-colors hover:bg-white/5 hover:text-foreground',
+          isActive && 'bg-white/[0.06] text-foreground',
           className,
         )
       }
       {...props}
     >
-      {link.icon}
-      <motion.span
-        animate={{
-          display: animate ? (open ? 'inline-block' : 'none') : 'inline-block',
-          opacity: animate ? (open ? 1 : 0) : 1,
-        }}
-        transition={{ duration: 0, delay: 0 }}
-        className="inline-block whitespace-pre text-sm"
-      >
-        {link.label}
-      </motion.span>
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <span className="absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-primary" />
+          )}
+          <span
+            className={cn(
+              'flex items-center justify-center',
+              isActive ? 'text-primary' : 'text-riven-muted',
+            )}
+          >
+            {link.icon}
+          </span>
+          <motion.span
+            animate={{
+              display: animate
+                ? open
+                  ? 'inline-block'
+                  : 'none'
+                : 'inline-block',
+              opacity: animate ? (open ? 1 : 0) : 1,
+            }}
+            transition={{ duration: 0.15 }}
+            className="whitespace-pre text-sm"
+          >
+            {link.label}
+          </motion.span>
+        </>
+      )}
     </NavLink>
   )
 }

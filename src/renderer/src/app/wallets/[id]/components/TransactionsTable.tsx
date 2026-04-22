@@ -1,36 +1,23 @@
-import {
-  Button,
-  Chip,
-  Pagination,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react'
+import { ExplorerLink } from '@renderer/components/ExplorerLink'
+import { Pagination } from '@renderer/components/ui/pagination'
+import { Spinner } from '@renderer/components/ui/spinner'
+import { Table } from '@renderer/components/ui/table'
 import { useRequest } from 'ahooks'
-import React, { useCallback, useMemo, type FC } from 'react'
+import { useMemo, type FC } from 'react'
 import { useTranslation } from 'react-i18next'
-import { HiOutlineCurrencyDollar } from 'react-icons/hi'
-import { LuClock } from 'react-icons/lu'
-import { RiMoneyPoundCircleLine } from 'react-icons/ri'
-import { TbHash } from 'react-icons/tb'
 import { useParams } from 'react-router'
 import type { Wallet } from '../../types'
 import type { Transaction } from '../types'
 
-export const columns = [
-  { name: 'HASH', uid: 'hash', icon: <TbHash size={20} /> },
-  { name: 'TIMESTAMP', uid: 'timestamp', icon: <LuClock size={20} /> },
-  { name: 'AMOUNT', uid: 'amount', icon: <RiMoneyPoundCircleLine size={20} /> },
-  { name: 'FEE', uid: 'fee', icon: <HiOutlineCurrencyDollar size={20} /> },
-  { name: 'SENDER', uid: 'sender', icon: <TbHash size={20} /> },
-  { name: 'RECIPIENT', uid: 'recipient', icon: <TbHash size={20} /> },
-]
-
 const PAGE_SIZE = 10
+
+type ColumnKey =
+  | 'hash'
+  | 'timestamp'
+  | 'amount'
+  | 'fee'
+  | 'sender'
+  | 'recipient'
 
 type TransactionsTableProps = {
   filterValue: string
@@ -46,54 +33,38 @@ export const TransactionsTable: FC<TransactionsTableProps> = ({
   const { walletId } = useParams<{ walletId: string }>()
   const { t } = useTranslation()
 
-  const columns = [
-    {
-      name: t('walletDetails.tableTitles.hash'),
-      uid: 'hash',
-      icon: <TbHash size={20} />,
-    },
-    {
-      name: t('walletDetails.tableTitles.timestamp'),
-      uid: 'timestamp',
-      icon: <LuClock size={20} />,
-    },
-    {
-      name: t('walletDetails.tableTitles.amount'),
-      uid: 'amount',
-      icon: <RiMoneyPoundCircleLine size={20} />,
-    },
-    {
-      name: t('walletDetails.tableTitles.fee'),
-      uid: 'fee',
-      icon: <HiOutlineCurrencyDollar size={20} />,
-    },
-    {
-      name: t('walletDetails.tableTitles.sender'),
-      uid: 'sender',
-      icon: <TbHash size={20} />,
-    },
-    {
-      name: t('walletDetails.tableTitles.recipient'),
-      uid: 'recipient',
-      icon: <TbHash size={20} />,
-    },
-  ]
+  const columns = useMemo(
+    () => [
+      { key: 'hash' as ColumnKey, label: t('walletDetails.tableTitles.hash') },
+      {
+        key: 'timestamp' as ColumnKey,
+        label: t('walletDetails.tableTitles.timestamp'),
+      },
+      {
+        key: 'amount' as ColumnKey,
+        label: t('walletDetails.tableTitles.amount'),
+      },
+      { key: 'fee' as ColumnKey, label: t('walletDetails.tableTitles.fee') },
+      {
+        key: 'sender' as ColumnKey,
+        label: t('walletDetails.tableTitles.sender'),
+      },
+      {
+        key: 'recipient' as ColumnKey,
+        label: t('walletDetails.tableTitles.recipient'),
+      },
+    ],
+    [t],
+  )
 
   const { data: walletAddress, loading: walletLoading } = useRequest<
     Wallet['address'],
     Error[]
   >(async () => {
-    if (!walletId) {
-      throw new Error('Wallet ID is missing from the URL')
-    }
-
+    if (!walletId) throw new Error('Wallet ID is missing from the URL')
     const walletData = await window.dbAPI.getWalletById(Number(walletId))
-
-    if (walletData?.address) {
-      return walletData.address
-    } else {
-      throw new Error('Wallet address not found')
-    }
+    if (walletData?.address) return walletData.address
+    throw new Error('Wallet address not found')
   })
 
   const { data: transactions = [], loading: transactionsLoading } = useRequest<
@@ -102,170 +73,113 @@ export const TransactionsTable: FC<TransactionsTableProps> = ({
   >(
     async () => {
       if (!walletAddress) return []
-
       const txs = await window.walletAPI.getWalletTransactions(walletAddress)
       return txs || []
     },
     {
       ready: Boolean(walletAddress),
+      cacheKey: `wallet-txs-${walletAddress}`,
       refreshDeps: [walletAddress],
-      pollingInterval: 5000, // Poll every 5 seconds
+      pollingInterval: 15_000,
+      staleTime: 30_000,
     },
   )
 
-  const isLoading = walletLoading || transactionsLoading
-
-  const hasSearchFilter = Boolean(filterValue)
+  // Only show the loading state on the very first fetch. Subsequent polls
+  // silently refresh the existing rows — no spinner flash every 15s.
+  const isInitialLoad =
+    (walletLoading || transactionsLoading) && transactions.length === 0
 
   const filteredItems = useMemo(() => {
-    if (!hasSearchFilter) return transactions
-
+    if (!filterValue) return transactions
     return transactions.filter((tx) =>
       tx.sender.toLowerCase().includes(filterValue.toLowerCase()),
     )
-  }, [hasSearchFilter, transactions, filterValue])
+  }, [transactions, filterValue])
 
-  const pages = Math.ceil(filteredItems.length / PAGE_SIZE)
+  const pages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
 
   const items = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
-    const end = start + PAGE_SIZE
-    return filteredItems.slice(start, end)
+    return filteredItems.slice(start, start + PAGE_SIZE)
   }, [page, filteredItems])
 
-  const onNextPage = useCallback(() => {
-    if (page < pages) setPage(page + 1)
-  }, [page, pages, setPage])
-
-  const onPreviousPage = useCallback(() => {
-    if (page > 1) setPage(page - 1)
-  }, [page, setPage])
-
-  const bottomContent = useMemo(() => {
-    return (
-      <div className="flex items-center justify-between px-2 py-2">
-        <span className="w-[30%]" />
-        <Pagination
-          isCompact
-          showControls
-          showShadow
-          color="default"
-          page={page}
-          total={pages}
-          onChange={setPage}
-        />
-        <div className="hidden w-[30%] justify-end gap-2 sm:flex">
-          <Button
-            isDisabled={page <= 1}
-            size="sm"
-            variant="flat"
-            onPress={onPreviousPage}
-          >
-            {t('walletDetails.previous')}
-          </Button>
-          <Button
-            isDisabled={page >= pages}
-            size="sm"
-            variant="flat"
-            onPress={onNextPage}
-          >
-            {t('walletDetails.next')}
-          </Button>
-        </div>
-      </div>
-    )
-  }, [page, pages, setPage, onPreviousPage, t, onNextPage])
-
-  const renderCell = useCallback(
-    (transaction: Transaction, columnKey: React.Key) => {
-      switch (columnKey) {
-        case 'hash':
-          return (
-            <h3 className="text-balance text-sm text-default-500">
-              {transaction.hash}
-            </h3>
-          )
-        case 'timestamp':
-          return (
-            <p className="text-balance text-center text-sm capitalize text-default-600">
-              {new Date(transaction.timestamp).toLocaleString('en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              })}
-            </p>
-          )
-        case 'amount': {
-          const amountColor =
-            transaction.sender === walletAddress ? 'danger' : 'success'
-          return (
-            <Chip color={amountColor} size="sm" variant="flat" className="px-4">
-              {transaction.amount} WART
-            </Chip>
-          )
-        }
-        case 'fee':
-          return (
-            <Chip color="warning" size="sm" variant="flat" className="px-4">
-              {transaction.fee} WART
-            </Chip>
-          )
-        case 'sender':
-          return (
-            <p className="text-sm text-default-500">{transaction.sender}</p>
-          )
-        case 'recipient':
-          return (
-            <p className="text-sm text-default-500">{transaction.recipient}</p>
-          )
-        default:
-          return null
+  const renderCell = (tx: Transaction, key: ColumnKey): React.ReactNode => {
+    switch (key) {
+      case 'hash':
+        return <ExplorerLink value={tx.hash} kind="tx" showIcon />
+      case 'timestamp': {
+        // Wartscan returns timestamps in seconds. JS Date expects ms — without
+        // the ×1000 multiplier everything shows up as Jan 1970.
+        const raw = Number(tx.timestamp)
+        const ms =
+          !Number.isFinite(raw) || raw === 0
+            ? NaN
+            : raw < 1e12
+              ? raw * 1000
+              : raw
+        return (
+          <span className="text-xs text-riven-muted">
+            {Number.isNaN(ms)
+              ? '—'
+              : new Date(ms).toLocaleString(undefined, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+          </span>
+        )
       }
-    },
-    [walletAddress],
-  )
+      case 'amount': {
+        const isOutgoing = tx.sender === walletAddress
+        return (
+          <span
+            className={`text-sm font-medium tabular-nums ${
+              isOutgoing ? 'text-danger' : 'text-success'
+            }`}
+          >
+            {isOutgoing ? '−' : '+'}
+            {tx.amount}{' '}
+            <span className="text-xs font-normal text-riven-muted">WART</span>
+          </span>
+        )
+      }
+      case 'fee':
+        return (
+          <span className="text-xs tabular-nums text-riven-muted">
+            {tx.fee}
+          </span>
+        )
+      case 'sender':
+        return <ExplorerLink value={tx.sender} kind="address" />
+      case 'recipient':
+        return <ExplorerLink value={tx.recipient} kind="address" />
+      default:
+        return null
+    }
+  }
 
   return (
-    <Table
-      aria-label="Transactions table"
-      bottomContent={bottomContent}
-      bottomContentPlacement="outside"
-      classNames={{ wrapper: 'max-h-[calc(100vh-270px)] scroll-sm' }}
-      radius="lg"
-    >
-      <TableHeader columns={columns}>
-        {(column) => (
-          <TableColumn
-            key={column.uid}
-            align={column.uid === 'timestamp' ? 'center' : 'start'}
-            className="px-8 py-4"
-          >
-            <div className="flex items-center gap-2.5">
-              {column?.icon} {column.name}
-            </div>
-          </TableColumn>
-        )}
-      </TableHeader>
-      <TableBody
-        items={items}
-        emptyContent={t('walletDetails.noTransactions')}
-        isLoading={isLoading}
-        className="rounded-[20px] bg-default-100 p-5"
-        loadingContent={<Spinner label={t('walletDetails.loading')} />}
-      >
-        {(item) => (
-          <TableRow key={item.hash}>
-            {(columnKey) => (
-              <TableCell className="py-5">
-                {renderCell(item, columnKey)}
-              </TableCell>
-            )}
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+    <div className="space-y-4">
+      <Table<Transaction, ColumnKey>
+        aria-label="Transactions"
+        columns={columns}
+        rows={items}
+        rowKey={(tx) => tx.hash}
+        renderCell={renderCell}
+        isLoading={isInitialLoad}
+        loadingContent={<Spinner size="sm" className="text-primary" />}
+        emptyContent={
+          <span className="text-sm text-riven-muted">
+            {t('walletDetails.noTransactions')}
+          </span>
+        }
+      />
+      <div className="flex justify-end">
+        <Pagination page={page} total={pages} onChange={setPage} />
+      </div>
+    </div>
   )
 }

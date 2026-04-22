@@ -1,25 +1,30 @@
+import { PasswordInput } from '@renderer/components/PasswordInput'
+import { Button } from '@renderer/components/ui/button'
+import { Form } from '@renderer/components/ui/form'
+import { Input } from '@renderer/components/ui/input'
 import {
-  addToast,
-  Button,
-  Form,
-  Input,
   Modal,
   ModalBody,
-  ModalContent,
+  ModalDescription,
   ModalFooter,
   ModalHeader,
-  useDisclosure,
-} from '@heroui/react'
-import { PasswordInput } from '@renderer/components/PasswordInput'
+  ModalTitle,
+} from '@renderer/components/ui/modal'
+import { addToast } from '@renderer/components/ui/toast'
 import { useState, type FC } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LuKeyRound } from 'react-icons/lu'
 import { useWallet } from '../wallets/WalletContext'
 
 const WALLET_PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}/
 
-export const RecoverWalletModal: FC = () => {
+type Props = {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export const RecoverWalletModal: FC<Props> = ({ isOpen, onClose }) => {
   const { refreshAsync } = useWallet()
-  const { isOpen, onClose, onOpen } = useDisclosure()
   const [password, setPassword] = useState('')
   const { t } = useTranslation()
 
@@ -91,110 +96,60 @@ export const RecoverWalletModal: FC = () => {
     }
   }
 
-  const validatePassword = (value: string): string | undefined => {
-    return !WALLET_PASSWORD_REGEX.test(value)
-      ? t('recoverWallet.errorPassword')
-      : undefined
-  }
-
-  const validateConfirmPassword = (value: string): string | undefined => {
-    return value !== password
-      ? t('toasts.passwordMismatch.description')
-      : undefined
-  }
-
   return (
-    <>
-      <Button onPress={onOpen} className="px-9">
-        {t('common.recoverWallet')}
-      </Button>
+    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <ModalHeader icon={<LuKeyRound size={18} className="text-primary" />}>
+        <ModalTitle>{t('recoverWallet.title')}</ModalTitle>
+        <ModalDescription>{t('recoverWallet.description')}</ModalDescription>
+      </ModalHeader>
 
-      <Modal
-        backdrop="blur"
-        isOpen={isOpen}
-        onClose={onClose}
-        size="xl"
-        hideCloseButton
-        classNames={{ wrapper: 'overflow-hidden' }}
-        className="bg-default-100"
-      >
-        <ModalContent>
-          <div className="space-y-12 px-12 py-12">
-            <ModalHeader className="block space-y-6 text-center">
-              <h3 className="text-[28px]">{t('recoverWallet.title')}</h3>
-              <p className="text-lg font-normal text-default-400">
-                {t('recoverWallet.description')}
-              </p>
-            </ModalHeader>
+      <ModalBody>
+        <Form onSubmit={onSubmit} id="recover-wallet-modal">
+          <Input
+            name="wallet"
+            label={t('common.walletName')}
+            errorMessage={t('recoverWallet.errorWalletName')}
+            isRequired
+            autoFocus
+          />
+          <Input
+            name="mnemonic"
+            label={t('common.mnemonic')}
+            errorMessage={t('recoverWallet.errorMnemonic')}
+            isRequired
+          />
+          <PasswordInput
+            name="password"
+            label={t('common.password')}
+            isRequired
+            onValueChange={setPassword}
+            validate={(v) =>
+              !WALLET_PASSWORD_REGEX.test(v)
+                ? t('recoverWallet.errorPassword')
+                : undefined
+            }
+          />
+          <PasswordInput
+            name="confirmPassword"
+            label={t('common.confirmPassword')}
+            isRequired
+            validate={(v) =>
+              v !== password
+                ? t('toasts.passwordMismatch.description')
+                : undefined
+            }
+          />
+        </Form>
+      </ModalBody>
 
-            <ModalBody>
-              <Form
-                onSubmit={onSubmit}
-                id="recover-wallet-modal"
-                className="space-y-8"
-              >
-                <Input
-                  name="wallet"
-                  type="text"
-                  errorMessage={t('recoverWallet.errorWalletName')}
-                  labelPlacement="outside"
-                  label={t('common.walletName')}
-                  isRequired
-                  size="lg"
-                  autoFocus
-                  variant="faded"
-                  classNames={{ inputWrapper: 'bg-default-200' }}
-                />
-                <Input
-                  name="mnemonic"
-                  type="text"
-                  errorMessage={t('recoverWallet.errorMnemonic')}
-                  labelPlacement="outside"
-                  label={t('common.mnemonic')}
-                  isRequired
-                  size="lg"
-                  variant="faded"
-                  classNames={{ inputWrapper: 'bg-default-200' }}
-                />
-                <PasswordInput
-                  name="password"
-                  errorMessage={t('recoverWallet.errorPassword')}
-                  labelPlacement="outside"
-                  label={t('common.password')}
-                  isRequired
-                  size="lg"
-                  variant="faded"
-                  classNames={{ inputWrapper: 'bg-default-200' }}
-                  onValueChange={setPassword}
-                  validate={validatePassword}
-                />
-                <PasswordInput
-                  name="confirmPassword"
-                  labelPlacement="outside"
-                  label={t('common.confirmPassword')}
-                  isRequired
-                  size="lg"
-                  validate={validateConfirmPassword}
-                  variant="faded"
-                  classNames={{ inputWrapper: 'bg-default-200' }}
-                />
-              </Form>
-            </ModalBody>
-
-            <ModalFooter>
-              <Button
-                color="secondary"
-                type="submit"
-                form="recover-wallet-modal"
-                fullWidth
-                radius="sm"
-              >
-                {t('common.recoverWallet')}
-              </Button>
-            </ModalFooter>
-          </div>
-        </ModalContent>
-      </Modal>
-    </>
+      <ModalFooter>
+        <Button variant="ghost" onClick={onClose}>
+          {t('passwordModal.cancel')}
+        </Button>
+        <Button type="submit" form="recover-wallet-modal" variant="primary">
+          {t('common.recoverWallet')}
+        </Button>
+      </ModalFooter>
+    </Modal>
   )
 }

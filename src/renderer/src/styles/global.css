@@ -3,33 +3,63 @@
 @tailwind utilities;
 
 @layer base {
+  html,
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.005em;
+  }
+
   body {
     @apply select-none overflow-x-hidden;
   }
 
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.02em;
+  }
+
   ::-webkit-scrollbar {
-    @apply h-2.5 w-2.5;
+    @apply h-1.5 w-1.5;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply cursor-grab rounded-[10px] bg-default-400;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-default-500;
+    background: rgba(255, 255, 255, 0.18);
   }
 }
 
 @layer utilities {
   .scroll-sm::-webkit-scrollbar {
-    @apply h-2 w-1.5;
+    @apply h-1.5 w-1.5;
   }
 
   .scroll-sm::-webkit-scrollbar-thumb {
-    @apply cursor-grab rounded-[10px] bg-default-400;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
   }
 
   .scroll-sm::-webkit-scrollbar-thumb:hover {
-    @apply bg-default-500;
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  .riven-surface {
+    @apply rounded-xl border border-riven-border bg-riven-surface;
+  }
+
+  .riven-hairline {
+    @apply border-b border-riven-border;
   }
 }

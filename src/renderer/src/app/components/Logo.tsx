@@ -1,33 +1,33 @@
-import { Image } from '@heroui/react'
 import { LOGO } from '@renderer/constants/images'
 import type { FC } from 'react'
 import { Link } from 'react-router'
 
 export const Logo: FC = () => {
   return (
-    <div className="flex min-w-6 items-center gap-4 pl-3">
-      <Image
+    <Link
+      to="/"
+      className="flex min-w-0 items-center gap-3 px-1 py-1"
+      aria-label="Wartlock"
+    >
+      <img
         src={LOGO}
-        width={50}
-        height={50}
-        alt="Logo"
-        className="h-5 w-6"
+        width={28}
+        height={28}
+        alt=""
+        className="h-7 w-7 shrink-0"
         draggable={false}
       />
-      <span className="hidden text-2xl font-medium group-hover/sidebar:inline-block">
+      <span className="hidden whitespace-nowrap text-[15px] font-semibold tracking-tight text-foreground group-hover/sidebar:inline-block">
         Wartlock
       </span>
-    </div>
+    </Link>
   )
 }
 
 export const LogoIcon: FC = () => {
   return (
-    <Link
-      to="/"
-      className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-black"
-    >
-      <div className="h-5 w-6 shrink-0 rounded-bl-sm rounded-br-lg rounded-tl-lg rounded-tr-sm bg-black dark:bg-white" />
+    <Link to="/" className="flex items-center" aria-label="Wartlock">
+      <img src={LOGO} width={28} height={28} alt="" className="h-7 w-7" />
     </Link>
   )
 }

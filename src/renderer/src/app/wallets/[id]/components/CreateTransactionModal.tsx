@@ -1,52 +1,99 @@
+import { Button } from '@renderer/components/ui/button'
+import { Form } from '@renderer/components/ui/form'
+import { Input } from '@renderer/components/ui/input'
 import {
-  addToast,
-  Button,
-  Form,
-  Input,
   Modal,
   ModalBody,
-  ModalContent,
+  ModalDescription,
+  ModalFooter,
   ModalHeader,
-  Switch,
-  useDisclosure,
-} from '@heroui/react'
-import { useEffect, useState, type FC } from 'react'
+  ModalTitle,
+} from '@renderer/components/ui/modal'
+import { Switch } from '@renderer/components/ui/switch'
+import { addToast } from '@renderer/components/ui/toast'
+import { useDisclosure } from '@renderer/hooks/use-disclosure'
+import { decodeQrFromFile } from '@renderer/lib/qr'
+import { useEffect, useRef, useState, type FC } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BiDollar } from 'react-icons/bi'
+import { LuQrCode, LuSend } from 'react-icons/lu'
 import { useParams } from 'react-router'
 
+/** Strip leading "-" and any extra signs so a number input can't go negative. */
+function sanitizePositive(v: string): string {
+  if (!v) return v
+  // Allow '0', '0.', '1e5', etc.; just reject negatives
+  return v.replace(/^-+/, '')
+}
+
 export const CreateTransactionModal: FC = () => {
-  const { isOpen, onClose, onOpen } = useDisclosure()
+  const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure()
   const { walletId } = useParams<{ walletId: string }>()
   const { t } = useTranslation()
 
   const [amount, setAmount] = useState('')
   const [networkFee, setNetworkFee] = useState('0.00000001')
-  const [developerFee, setDeveloperFee] = useState('5')
+  const [developerFee, setDeveloperFee] = useState('0')
   const [recipient, setRecipient] = useState('')
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [payDevFee, setPayDevFee] = useState(true)
+  const [payDevFee, setPayDevFee] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleScanQr = (): void => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      setScanning(true)
+      const decoded = await decodeQrFromFile(file)
+      if (!decoded) {
+        addToast({
+          title: t('transaction.qrFailed'),
+          description: t('transaction.qrFailedDescription'),
+          color: 'danger',
+        })
+        return
+      }
+      // Accept "wartlock:<address>" URIs too, fall back to raw string.
+      const address = decoded.replace(/^(wartlock|warthog):/i, '').trim()
+      setRecipient(address)
+      addToast({
+        title: t('transaction.qrDetected'),
+        description: t('transaction.qrDetectedDescription'),
+        color: 'success',
+      })
+    } catch {
+      addToast({
+        title: t('transaction.qrFailed'),
+        description: t('transaction.qrFailedDescription'),
+        color: 'danger',
+      })
+    } finally {
+      setScanning(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchWalletAddress = async (): Promise<void> => {
+    const fetch = async (): Promise<void> => {
       if (!walletId) return
-      try {
-        const walletData = await window.dbAPI.getWalletById(Number(walletId))
-        if (walletData?.address) {
-          setWalletAddress(walletData.address)
-        }
-      } catch (err) {
-        console.error('Failed to fetch wallet address:', err)
-      }
+      const walletData = await window.dbAPI.getWalletById(Number(walletId))
+      if (walletData?.address) setWalletAddress(walletData.address)
     }
-    fetchWalletAddress()
+    fetch()
   }, [walletId])
 
   useEffect(() => {
     if (amount && payDevFee) {
-      // 计算5%的开发者费用
-      const devFee = (parseFloat(amount) * 0.05).toFixed(8)
-      setDeveloperFee(devFee)
+      setDeveloperFee((parseFloat(amount) * 0.05).toFixed(8))
+    } else if (!payDevFee) {
+      setDeveloperFee('0')
     }
   }, [amount, payDevFee])
 
@@ -59,35 +106,55 @@ export const CreateTransactionModal: FC = () => {
         title: t('walletDetails.error'),
         description: t('walletDetails.walletNotFound'),
         color: 'danger',
-        timeout: 2000,
+      })
+      return
+    }
+
+    const amountNum = parseFloat(amount)
+    const feeNum = parseFloat(networkFee)
+    const devFeeNum = payDevFee ? parseFloat(developerFee) : 0
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      addToast({
+        title: t('transaction.invalidAmount'),
+        description: t('transaction.invalidAmountDescription'),
+        color: 'danger',
+      })
+      return
+    }
+    if (!Number.isFinite(feeNum) || feeNum < 0) {
+      addToast({
+        title: t('transaction.invalidFee'),
+        description: t('transaction.invalidFeeDescription'),
+        color: 'danger',
+      })
+      return
+    }
+    if (devFeeNum < 0) {
+      addToast({
+        title: t('transaction.invalidFee'),
+        description: t('transaction.invalidFeeDescription'),
+        color: 'danger',
       })
       return
     }
 
     try {
-      const txData = {
-        recipient,
-        amount: parseFloat(amount),
-        fee: parseFloat(networkFee),
-      }
-
+      setSending(true)
       const privateKey = await window.storageAPI.getPrivateKey(walletAddress)
       const peerUrl = await window.dbAPI.getPeer()
 
       await window.walletAPI.sendTransaction(
-        txData.recipient,
-        txData.amount,
-        txData.fee,
+        recipient,
+        amountNum,
+        feeNum,
         String(privateKey),
         peerUrl,
       )
 
-      // Optional: Send dev fees if the user agrees to it
-      // Could be disabled by setting developerFee to 0
-      if (parseFloat(developerFee) > 0) {
+      if (devFeeNum > 0) {
         await window.walletAPI.sendTransaction(
           'aca4916c89b8fb47784d37ad592d378897f616569d3ee0d4',
-          parseFloat(developerFee),
+          devFeeNum,
           0,
           String(privateKey),
           peerUrl,
@@ -98,119 +165,145 @@ export const CreateTransactionModal: FC = () => {
         title: t('walletDetails.transactionSent'),
         description: t('walletDetails.transactionSuccess'),
         color: 'success',
-        timeout: 2000,
       })
-
       onClose()
-    } catch (err) {
-      console.error('Transaction failed:', err)
+    } catch {
       addToast({
         title: t('walletDetails.transactionFailed'),
         description: t('walletDetails.transactionError'),
         color: 'danger',
-        timeout: 2000,
       })
+    } finally {
+      setSending(false)
     }
   }
 
   return (
     <>
       <Button
-        color="secondary"
-        variant="shadow"
-        className="px-6 font-light"
-        startContent={<BiDollar className="text-default-800" size={20} />}
-        onPress={onOpen}
+        variant="primary"
+        startContent={<LuSend size={14} />}
+        onClick={onOpen}
       >
         {t('walletDetails.makeTransaction')}
       </Button>
 
-      <Modal
-        backdrop="blur"
-        isOpen={isOpen}
-        onClose={onClose}
-        size="xl"
-        hideCloseButton
-        classNames={{ wrapper: 'overflow-hidden' }}
-        className="bg-default-100"
-      >
-        <ModalContent>
-          <div className="space-y-12 px-12 py-12">
-            <ModalHeader className="block space-y-6 text-center">
-              <h3 className="text-[28px]">
-                {t('walletDetails.makeTransaction')}
-              </h3>
-              <p className="text-lg font-normal text-default-400">
-                {t('walletDetails.sendDescription')}
-              </p>
-            </ModalHeader>
-            <ModalBody>
-              <Form onSubmit={onSubmit} className="space-y-10">
-                <Input
-                  name="amount"
-                  type="number"
-                  labelPlacement="outside"
-                  label={t('walletDetails.amount')}
-                  isRequired
-                  size="lg"
-                  autoFocus
-                  variant="faded"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  classNames={{ inputWrapper: 'bg-default-200' }}
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="lg">
+        <ModalHeader icon={<LuSend size={18} className="text-primary" />}>
+          <ModalTitle>{t('walletDetails.makeTransaction')}</ModalTitle>
+          <ModalDescription>
+            {t('walletDetails.sendDescription')}
+          </ModalDescription>
+        </ModalHeader>
+
+        <ModalBody>
+          <Form id="create-tx-form" onSubmit={onSubmit}>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs uppercase tracking-wider text-riven-muted">
+                  {t('walletDetails.recipient')}
+                  <span className="ml-0.5 text-danger">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleScanQr}
+                  disabled={scanning}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-riven-border bg-transparent px-2 py-1 text-[11px] font-medium text-riven-muted transition-colors hover:border-riven-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
+                >
+                  <LuQrCode size={12} />
+                  {scanning
+                    ? t('transaction.scanning')
+                    : t('transaction.scanQr')}
+                </button>
+              </div>
+              <Input
+                name="recipient"
+                placeholder="0x…"
+                isRequired
+                autoFocus
+                value={recipient}
+                onValueChange={setRecipient}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFile}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                name="amount"
+                type="number"
+                label={t('walletDetails.amount')}
+                isRequired
+                value={amount}
+                onValueChange={(v) => setAmount(sanitizePositive(v))}
+                min={0}
+                step="any"
+                endContent={
+                  <span className="text-xs text-riven-muted">WART</span>
+                }
+              />
+              <Input
+                name="networkFee"
+                type="number"
+                label={t('walletDetails.networkFee')}
+                isRequired
+                value={networkFee}
+                onValueChange={(v) => setNetworkFee(sanitizePositive(v))}
+                min={0}
+                step="any"
+              />
+            </div>
+
+            <div className="rounded-lg border border-riven-border p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t('walletDetails.payDevFee')}
+                  </p>
+                  <p className="mt-0.5 text-xs text-riven-muted">
+                    Optional tip to support development.
+                  </p>
+                </div>
+                <Switch
+                  isSelected={payDevFee}
+                  onValueChange={setPayDevFee}
+                  size="sm"
                 />
-                <Input
-                  name="networkFee"
-                  type="number"
-                  labelPlacement="outside"
-                  label={t('walletDetails.networkFee')}
-                  isRequired
-                  size="lg"
-                  variant="faded"
-                  value={networkFee}
-                  onChange={(e) => setNetworkFee(e.target.value)}
-                  classNames={{ inputWrapper: 'bg-default-200' }}
-                />
-                <div className="mb-4 flex items-center justify-between">
-                  <span className="text-md text-text-secondary dark:text-text-secondary mr-4 font-medium">
-                    {t('walletDetails.payDevFee', 'Pay Developer Fee (5%)')}
-                  </span>
-                  <Switch
-                    isSelected={payDevFee}
-                    onValueChange={setPayDevFee}
-                    size="md"
-                    color="primary"
+              </div>
+              {payDevFee && (
+                <div className="mt-4">
+                  <Input
+                    name="developerFee"
+                    type="number"
+                    label="Fee"
+                    value={developerFee}
+                    onValueChange={(v) => setDeveloperFee(sanitizePositive(v))}
+                    min={0}
+                    step="any"
                   />
                 </div>
-                <Input
-                  name="developerFee"
-                  type="number"
-                  labelPlacement="outside"
-                  size="lg"
-                  variant="faded"
-                  value={developerFee}
-                  isDisabled={!payDevFee}
-                  onChange={(e) => setDeveloperFee(e.target.value)}
-                />
-                <Input
-                  name="recipient"
-                  type="text"
-                  labelPlacement="outside"
-                  label={t('walletDetails.recipient')}
-                  isRequired
-                  size="lg"
-                  variant="faded"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  classNames={{ inputWrapper: 'bg-default-200' }}
-                />
-                <Button color="default" type="submit" fullWidth radius="sm">
-                  {t('walletDetails.confirm')}
-                </Button>
-              </Form>
-            </ModalBody>
-          </div>
-        </ModalContent>
+              )}
+            </div>
+          </Form>
+        </ModalBody>
+
+        <ModalFooter>
+          <Button variant="ghost" onClick={onClose}>
+            {t('passwordModal.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            form="create-tx-form"
+            variant="primary"
+            isLoading={sending}
+          >
+            {t('walletDetails.confirm')}
+          </Button>
+        </ModalFooter>
       </Modal>
     </>
   )

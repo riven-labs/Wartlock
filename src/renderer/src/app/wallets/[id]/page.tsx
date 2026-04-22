@@ -1,19 +1,22 @@
 import { useState, type FC } from 'react'
 import { TransactionsTable } from './components/TransactionsTable'
-import { WalletNavbar } from './components/WalletNavbar'
+import { WalletActivity } from './components/WalletActivity'
+import { WalletHeader, WalletToolbar } from './components/WalletNavbar'
 
 const Wallet: FC = () => {
   const [filterValue, setFilterValue] = useState('')
   const [page, setPage] = useState(1)
 
   return (
-    <main className="space-y-10">
-      <WalletNavbar
+    <main className="mx-auto max-w-7xl space-y-6 py-2">
+      <WalletHeader />
+      <WalletActivity />
+      <WalletToolbar
         filterValue={filterValue}
         setFilterValue={setFilterValue}
         setPage={setPage}
       />
-      <section className="h-page rounded-[20px] bg-default-100 p-5">
+      <section>
         <TransactionsTable
           filterValue={filterValue}
           page={page}

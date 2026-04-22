@@ -132,16 +132,106 @@ export async function getBalance(
   }
 }
 
+/**
+ * Tiny TTL cache for CoinGecko responses. The free-tier rate limit bites fast
+ * if every wallet detail + dashboard mount refetches, so we share one cached
+ * payload across all renderers and only hit the network once per window.
+ */
+type CacheEntry<T> = { value: T; ts: number }
+const cache = new Map<string, CacheEntry<unknown>>()
+const inflight = new Map<string, Promise<unknown>>()
+
+async function memo<T>(
+  key: string,
+  ttlMs: number,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const now = Date.now()
+  const hit = cache.get(key) as CacheEntry<T> | undefined
+  if (hit && now - hit.ts < ttlMs) return hit.value
+
+  const running = inflight.get(key) as Promise<T> | undefined
+  if (running) return running
+
+  const p = (async () => {
+    try {
+      const value = await fn()
+      cache.set(key, { value, ts: Date.now() })
+      return value
+    } finally {
+      inflight.delete(key)
+    }
+  })()
+  inflight.set(key, p)
+  return p
+}
+
 export async function fetchWarthogPrice(): Promise<number> {
-  try {
-    const response = await axios.get(
-      'https://api.coingecko.com/api/v3/simple/price?ids=warthog&vs_currencies=usd',
-    )
-    return response.data?.warthog?.usd || 0
-  } catch (error) {
-    console.error('Failed to fetch WART price:', error)
-    return 0
-  }
+  return memo('wart-price', 5 * 60_000, async () => {
+    try {
+      const { data } = await axios.get(
+        'https://api.coingecko.com/api/v3/simple/price?ids=warthog&vs_currencies=usd',
+        { timeout: 10_000 },
+      )
+      return (data?.warthog?.usd as number) || 0
+    } catch {
+      return 0
+    }
+  })
+}
+
+export type WarthogMarket = {
+  priceUsd: number
+  change24hPct: number | null
+  change7dPct: number | null
+  volume24h: number | null
+  marketCap: number | null
+  high24h: number | null
+  low24h: number | null
+  ath: number | null
+  athChangePct: number | null
+}
+
+export async function fetchWarthogMarket(): Promise<WarthogMarket | null> {
+  return memo('wart-market', 5 * 60_000, async () => {
+    try {
+      const { data } = await axios.get(
+        'https://api.coingecko.com/api/v3/coins/warthog?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false',
+        { timeout: 10_000 },
+      )
+      const m = data?.market_data || {}
+      return {
+        priceUsd: m.current_price?.usd ?? 0,
+        change24hPct: m.price_change_percentage_24h ?? null,
+        change7dPct: m.price_change_percentage_7d ?? null,
+        volume24h: m.total_volume?.usd ?? null,
+        marketCap: m.market_cap?.usd ?? null,
+        high24h: m.high_24h?.usd ?? null,
+        low24h: m.low_24h?.usd ?? null,
+        ath: m.ath?.usd ?? null,
+        athChangePct: m.ath_change_percentage?.usd ?? null,
+      } satisfies WarthogMarket
+    } catch {
+      return null
+    }
+  })
+}
+
+export async function fetchWarthogPriceHistory(
+  days = 7,
+): Promise<Array<{ t: number; p: number }>> {
+  return memo(`wart-history-${days}`, 15 * 60_000, async () => {
+    try {
+      const { data } = await axios.get(
+        `https://api.coingecko.com/api/v3/coins/warthog/market_chart?vs_currency=usd&days=${days}`,
+        { timeout: 10_000 },
+      )
+      const prices: Array<[number, number]> = data?.prices || []
+      return prices.map(([t, p]) => ({ t, p }))
+    } catch {
+      return []
+    }
+  })
 }
 
 // https://wartscan.io/api/v1/accounts/transactions?address=aca4916c89b8fb47784d37ad592d378897f616569d3ee0d4

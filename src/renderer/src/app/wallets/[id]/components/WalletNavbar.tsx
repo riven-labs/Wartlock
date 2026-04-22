@@ -1,4 +1,6 @@
-import { Button, Chip, Input, Navbar as NavbarComponent } from '@heroui/react'
+import { ExplorerLink } from '@renderer/components/ExplorerLink'
+import { Button } from '@renderer/components/ui/button'
+import { Input } from '@renderer/components/ui/input'
 import { useRequest } from 'ahooks'
 import { useCallback, type FC } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,40 +13,22 @@ import { ReceiveWartModal } from './ReceiveWartModal'
 type Wallet = {
   name: string
   address: string
-  balanceWART: number
-  balanceUSD: number
 }
 
-type WalletNavbarProps = {
-  filterValue: string
-  setFilterValue: (value: string) => void
-  setPage: (value: number) => void
-}
-
-export const WalletNavbar: FC<WalletNavbarProps> = ({
-  filterValue,
-  setFilterValue,
-  setPage,
-}) => {
+export const WalletHeader: FC = () => {
   const { walletId } = useParams<{ walletId: string }>()
   const navigate = useNavigate()
   const { t } = useTranslation()
+
   const { data: walletData, loading: walletLoading } = useRequest<
     Wallet,
     Error[]
   >(
     async () => {
-      if (!walletId) {
-        throw new Error('Wallet ID is missing from the URL')
-      }
-
+      if (!walletId) throw new Error('Wallet ID is missing from the URL')
       return (await window.dbAPI.getWalletById(Number(walletId))) as Wallet
     },
-    {
-      cacheKey: walletId,
-      refreshDeps: [walletId],
-      ready: !!walletId,
-    },
+    { cacheKey: walletId, refreshDeps: [walletId], ready: !!walletId },
   )
 
   const { data: balanceData } = useRequest<
@@ -52,80 +36,29 @@ export const WalletNavbar: FC<WalletNavbarProps> = ({
     Error[]
   >(
     async () => {
-      if (!walletData) {
-        throw new Error('Wallet Data is missing')
-      }
-
-      // Check if data is expired
-      const cachedData = window.sessionStorage.getItem(`${walletId}-balance`)
-      if (cachedData) {
-        const parsedData = JSON.parse(cachedData)
-        const expirationTime = new Date(parsedData.expirationTime)
-        if (expirationTime < new Date()) {
-          window.sessionStorage.removeItem(`${walletId}-balance`)
-        } else {
-          return parsedData
-        }
-      }
-
-      // Fetch peer and WART balance
+      if (!walletData) throw new Error('Wallet Data is missing')
       const peer = await window.dbAPI.getPeer()
       const balanceWART = await window.walletAPI.getBalance(
         peer,
         walletData.address,
       )
-
-      // Fetch WART price
       const wartPrice = await window.walletAPI.fetchWarthogPrice()
-      const numericBalanceWART = balanceWART ? parseFloat(balanceWART) : 0
-
-      // Calculate USD balance
-      const balanceUSD = numericBalanceWART * wartPrice
-
-      // Save data in session storage with 5 minutes expiration time
-      const now = new Date()
-      const expirationTime = new Date(now.getTime() + 5 * 60 * 1000)
-      window.sessionStorage.setItem(
-        `${walletId}-balance`,
-        JSON.stringify({
-          balanceWART,
-          balanceUSD,
-          expirationTime: expirationTime.toISOString(),
-        }),
-      )
-
-      await window.dbAPI.updateBalance(walletData.address, String(balanceWART))
-
-      return {
-        balanceWART,
-        balanceUSD,
+      const num = balanceWART ? parseFloat(balanceWART) : 0
+      const balanceUSD = num * wartPrice
+      if (balanceWART != null) {
+        await window.dbAPI.updateBalance(
+          walletData.address,
+          String(balanceWART),
+        )
       }
+      return { balanceWART, balanceUSD }
     },
     {
       cacheKey: `${walletId}-balance`,
       refreshDeps: [walletId],
-      cacheTime: 5 * 60 * 1000, // 5 minutes
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      pollingInterval: 5000, // Poll every 5 seconds,
+      pollingInterval: 30_000,
       ready: !!walletData,
     },
-  )
-
-  const onClear = useCallback(() => {
-    setFilterValue('')
-    setPage(1)
-  }, [setFilterValue, setPage])
-
-  const onSearchChange = useCallback(
-    (value?: string) => {
-      if (value) {
-        setFilterValue(value)
-        setPage(1)
-      } else {
-        setFilterValue('')
-      }
-    },
-    [setFilterValue, setPage],
   )
 
   const handleLogout = async (): Promise<void> => {
@@ -135,65 +68,116 @@ export const WalletNavbar: FC<WalletNavbarProps> = ({
     navigate('/')
   }
 
-  return (
-    <NavbarComponent
-      maxWidth="full"
-      className="bg-transparent py-4"
-      classNames={{ wrapper: 'block space-y-6' }}
-    >
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl">
-          {walletLoading
-            ? t('walletDetails.loading')
-            : walletData
-              ? `${walletData.name}'s ${t('walletDetails.wallet')}`
-              : t('walletDetails.walletNotFound')}
-        </h2>
+  const wart = balanceData?.balanceWART
+  const usd = balanceData?.balanceUSD
 
-        <div className="flex items-center justify-center gap-4">
-          <Chip variant="dot" color="warning">
-            <span className="font-light">{t('walletDetails.balanceWART')}</span>
-            :{' '}
-            <span className="font-medium text-warning">
-              {balanceData?.balanceWART ?? t('walletDetails.loading')}
-            </span>
-          </Chip>
-          <Chip variant="dot" color="success">
-            <span className="font-light">{t('walletDetails.balanceUSD')}</span>:{' '}
-            <span className="font-medium text-success">
-              {balanceData?.balanceUSD !== undefined
-                ? `${balanceData.balanceUSD.toFixed(2)}`
-                : t('walletDetails.loading')}
-            </span>
-          </Chip>
+  return (
+    <div className="space-y-6 py-6">
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wider text-riven-muted">
+            {t('walletDetails.wallet')}
+          </p>
+          <h1 className="mt-1 truncate text-[28px] font-semibold tracking-tight">
+            {walletLoading
+              ? t('walletDetails.loading')
+              : walletData?.name || t('walletDetails.walletNotFound')}
+          </h1>
+          {walletData?.address && (
+            <div className="mt-1">
+              <ExplorerLink
+                value={walletData.address}
+                kind="address"
+                showIcon
+              />
+            </div>
+          )}
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleLogout}
+          aria-label="Logout"
+          className="hover:text-danger"
+        >
+          <RiLogoutCircleRLine size={16} />
+        </Button>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-riven-border bg-riven-surface p-5">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-riven-muted">
+            {t('walletDetails.balanceWART')}
+          </p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">
+            {wart ?? '—'}{' '}
+            <span className="text-sm font-normal text-riven-muted">WART</span>
+          </p>
+        </div>
+        <div className="rounded-xl border border-riven-border bg-riven-surface p-5">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-riven-muted">
+            {t('walletDetails.balanceUSD')}
+          </p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">
+            {usd !== undefined ? `$${usd.toFixed(2)}` : '—'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type WalletToolbarProps = {
+  filterValue: string
+  setFilterValue: (value: string) => void
+  setPage: (value: number) => void
+}
+
+export const WalletToolbar: FC<WalletToolbarProps> = ({
+  filterValue,
+  setFilterValue,
+  setPage,
+}) => {
+  const { walletId } = useParams<{ walletId: string }>()
+  const { t } = useTranslation()
+
+  const { data: walletData } = useRequest<Wallet, Error[]>(
+    async () => {
+      if (!walletId) throw new Error('Wallet ID is missing from the URL')
+      return (await window.dbAPI.getWalletById(Number(walletId))) as Wallet
+    },
+    { cacheKey: walletId, refreshDeps: [walletId], ready: !!walletId },
+  )
+
+  const onClear = useCallback(() => {
+    setFilterValue('')
+    setPage(1)
+  }, [setFilterValue, setPage])
+
+  const onSearchChange = useCallback(
+    (value: string) => {
+      setFilterValue(value)
+      setPage(1)
+    },
+    [setFilterValue, setPage],
+  )
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="w-full sm:max-w-sm">
         <Input
-          isClearable
-          className="w-full sm:max-w-[33%]"
           placeholder={t('walletDetails.searchBySender')}
-          startContent={<LuSearch className="text-default-400" />}
+          startContent={<LuSearch size={14} className="text-riven-muted" />}
           value={filterValue}
+          isClearable
           onClear={onClear}
           onValueChange={onSearchChange}
         />
-
-        <div className="flex items-center gap-6">
-          <ReceiveWartModal address={walletData?.address} />
-          <CreateTransactionModal />
-          <Button
-            color="danger"
-            variant="bordered"
-            isIconOnly
-            onPress={handleLogout}
-            isLoading={walletLoading}
-          >
-            <RiLogoutCircleRLine size={20} />
-          </Button>
-        </div>
       </div>
-    </NavbarComponent>
+      <div className="flex items-center gap-2">
+        <ReceiveWartModal address={walletData?.address} />
+        <CreateTransactionModal />
+      </div>
+    </div>
   )
 }

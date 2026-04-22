@@ -13,8 +13,62 @@ files:
   - '!**/*.db'
   - '!*.original'
   - '!*.lock'
+  # Size trimming — strip dev/source/doc files from node_modules
+  - '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme,HISTORY.md,AUTHORS,CONTRIBUTORS,NOTICE}'
+  - '!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples,docs,doc,.github,.nyc_output}'
+  - '!**/node_modules/*/{.eslintrc,.eslintrc.*,.editorconfig,.prettierrc,.prettierrc.*,.travis.yml,.npmignore,.gitignore,.gitattributes,tsconfig.json}'
+  - '!**/node_modules/*/*.md'
+  - '!**/node_modules/*/*.markdown'
+  - '!**/node_modules/*.d.ts'
+  - '!**/node_modules/**/*.map'
+  - '!**/*.ts.map'
+  - '!**/*.js.map'
+  - '!**/*.css.map'
+  # Renderer-only packages — bundled by Vite into out/renderer; not needed at runtime
+  - '!**/node_modules/@heroui/**'
+  - '!**/node_modules/@react-aria/**'
+  - '!**/node_modules/@react-spectrum/**'
+  - '!**/node_modules/@react-stately/**'
+  - '!**/node_modules/@react-types/**'
+  - '!**/node_modules/react-aria/**'
+  - '!**/node_modules/react-aria-components/**'
+  - '!**/node_modules/react-stately/**'
+  - '!**/node_modules/@adobe/**'
+  - '!**/node_modules/@internationalized/**'
+  - '!**/node_modules/@formatjs/**'
+  - '!**/node_modules/@tanstack/**'
+  - '!**/node_modules/framer-motion/**'
+  - '!**/node_modules/ahooks/**'
+  - '!**/node_modules/i18next/**'
+  - '!**/node_modules/i18next-browser-languagedetector/**'
+  - '!**/node_modules/react-i18next/**'
+  - '!**/node_modules/react-icons/**'
+  - '!**/node_modules/react-router/**'
+  - '!**/node_modules/react/**'
+  - '!**/node_modules/react-dom/**'
+  - '!**/node_modules/react-is/**'
+  - '!**/node_modules/scheduler/**'
+  - '!**/node_modules/use-sync-external-store/**'
+  - '!**/node_modules/aria-hidden/**'
+  - '!**/node_modules/lodash/**'
+  - '!**/node_modules/tslib/**'
+  - '!**/node_modules/qrcode/**'
+  - '!**/node_modules/jsqr/**'
+  - '!**/node_modules/pngjs/**'
+  - '!**/node_modules/dijkstrajs/**'
+  # adm-zip and tar ARE used at runtime (main process) — keep them in the bundle.
+  # Build-only tools — should not ship
+  - '!**/node_modules/@faker-js/**'
+  - '!**/node_modules/@esbuild/**'
+  - '!**/node_modules/esbuild/**'
+  - '!**/node_modules/vite-tsconfig-paths/**'
+compression: maximum
+electronLanguages:
+  - en-US
+asar: true
 asarUnpack:
   - resources/**
+afterPack: build/afterPack.cjs
 win:
   executableName: wartlock
 nsis:
