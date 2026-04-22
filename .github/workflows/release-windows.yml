@@ -1,21 +1,33 @@
 name: Release Windows
 
-# Triggered by pushing a tag like `v1.2.3`. Also exposed as a manual
-# dispatch so maintainers can kick off a build without tagging first.
+# Fires in two situations:
+#   1. You push a tag like `v1.0.0` — the tag name becomes the release tag.
+#   2. You click "Run workflow" in the Actions tab. You can type an explicit
+#      tag in the dispatch input, or leave it blank to use the `version`
+#      field from package.json (prefixed with `v`).
+#
+# In both cases the result is a PUBLISHED GitHub Release with the Windows
+# installer attached. No drafts — this workflow only runs when you've
+# decided to ship.
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0). Leave blank to use package.json version.'
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build Windows installer
+    name: Build & publish Windows release
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -25,48 +37,69 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
-      # `npm ci` runs postinstall → `electron-builder install-app-deps` which
-      # rebuilds better-sqlite3 and keytar against the Electron ABI. The
-      # windows-latest runner ships VS2022 + Windows SDK, so the native
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            NAME="${GITHUB_REF_NAME}"
+          elif [ -n "${{ inputs.tag }}" ]; then
+            NAME="${{ inputs.tag }}"
+          else
+            VER=$(node -p "require('./package.json').version")
+            NAME="v${VER}"
+          fi
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "Release tag will be: ${NAME}"
+
+      # `npm install` (not `ci`) because this repo policy is to not commit the
+      # lockfile. The postinstall script runs electron-builder install-app-deps
+      # which rebuilds better-sqlite3 + keytar against Electron's ABI.
+      # windows-latest has VS 2022 + Windows SDK preinstalled, so the native
       # toolchain is available.
       - name: Install dependencies
-        run: npm ci
+        shell: bash
+        run: npm install
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Generate icons
+        shell: bash
         run: npm run build:icons
 
-      # Build NSIS installer. `--publish never` keeps electron-builder from
-      # trying to hit the `publish` endpoint configured in electron-builder.yml
-      # — we upload via softprops/action-gh-release in the next step instead,
-      # which is easier to debug when something goes wrong.
       - name: Build Windows installer
+        shell: bash
         run: npx electron-builder --win --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifact
+      - name: List build output
+        shell: bash
+        run: ls -la dist/
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wartlock-windows
+          name: wartlock-${{ steps.tag.outputs.name }}-windows
           path: |
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
-          retention-days: 14
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: Wartlock ${{ steps.tag.outputs.name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          make_latest: 'true'
           files: |
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
-          fail_on_unmatched_files: false
-          draft: true
-          generate_release_notes: true
+          fail_on_unmatched_files: true

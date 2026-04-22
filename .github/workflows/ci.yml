@@ -5,31 +5,25 @@ on:
   push:
     branches: [main]
 
+# Typecheck + lint on the same Windows target the release pipeline uses.
+# `--ignore-scripts` skips electron-builder's install-app-deps rebuild so CI
+# doesn't need the native toolchain — we only need TypeScript to be happy.
 jobs:
-  # Typecheck doesn't need the native toolchain — `--ignore-scripts` skips
-  # the electron-builder install-app-deps rebuild, keeping CI fast.
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  checks:
+    name: Typecheck & lint
+    runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-      - run: npm ci --ignore-scripts
-      - run: npm run typecheck
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-      - run: npm ci --ignore-scripts
-      - run: npm run lint
+      - name: Install dependencies
+        shell: bash
+        run: npm install --ignore-scripts
+      - name: Typecheck
+        shell: bash
+        run: npm run typecheck
+      - name: Lint
+        shell: bash
+        run: npm run lint
